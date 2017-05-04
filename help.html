@@ -1,0 +1,22 @@
+<div style="width: 700px; text-align: left; margin-left: auto; margin-right: auto;">
+Flight Predictor is used to predict the flight path of a High Altitude
+Balloon (HAB) flight.<br><br>
+
+<span style="font-weight: bold; color: red;">NOTE:&nbsp; The prediction is only as good as the input data.&nbsp; Make sure Burst Altitude, Ascent and Descent Rates are 
+as accurate as possible.</span><br>
+
+<h3>Quick Start Instructions</h3>
+
+<ol><li>Enter the Prediction Info</li>
+  <ol style="list-style-type: upper-alpha;">
+    <li>Select the "Prediction Info" tab</li>
+    <li>Enter the data required to make a prediction</li>
+    <li>Click "Generate Prediction".&nbsp;  <br></li>
+  </ol>
+  <li>View the Prediction Results</li>
+  <ol style="list-style-type: upper-alpha;">
+    <li>Select "Prediction Results" to view the prediction map.</li><li>Click the Auto Fit Map to zoom to the markers on the map.</li><li>You can drag the border between the Table, Map, and Altitude graph to change their sizes.<br></li>
+  </ol>
+</ol>Repeat steps 1 and 2 to add more predictions to the results.<br><br>As the prediction is generated, the wind data is downloaded as blocks from NOAA.&nbsp; Each prediction time is downloaded separately.&nbsp; Each block takes 15 to 40 seconds to download so long flights will take some time to generate.&nbsp; The data is saved so generating additional scenarios will be fast .&nbsp; There is a limit to the amount of data kept so the early data may be deleted if you do a very long prediction.<br><br>The launch and touchdown altitudes are retrieved from google maps.&nbsp; You can also put in your own altitudes if you want.&nbsp; For an in-flight floater prediction you can just use an altitude slightly below the float altitude.<br><br>You can enter a float time for floaters.&nbsp; The burst altitude becomes the float altitude.<br><br>You can run many predictions by just making changes to the Prediction info and re-running.&nbsp; All will be displayed on the map.<br><br>You can turn on and off the waypoints, markers and lines for each prediction by clicking on the check boxes in the table on the results page.<br><br>You can turn on a 2 marker ruler to measure distances.<br><br>Checking the show wind box will show the weather grids downloaded on the map.<br><br>You can load predictions you have saved as well as tracks from actual flights saved as CSV files from aprs.fi or findu.com.<br><br>And finally, you can save a prediction to the s3research flight that can be viewed on aprs.fi along with the actual flight.&nbsp; You can find saved overlays here: <a href="http://www.s3research.com/tools/overlays" target="_blank">http://www.s3research.com/tools/overlays</a><br>
+
+</div>

@@ -1,0 +1,691 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <title>NO GOOGLE KEY Balloon Flight Predictor</title>
+        <meta charset="utf-8" />
+        <link rel="stylesheet" href="flightPredictor.css" type="text/css" />
+        <link rel="stylesheet" href="../libs/jqwidgets-3.8.1/styles/jqx.base.css" type="text/css" />
+        <link rel="stylesheet" href="../libs/jqwidgets-3.8.1/styles/jqx.fresh.css" type="text/css" />
+        <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?libraries=geometry&sensor=true"></script>
+        <!-- type="text/javascript" src="https://maps.googleapis.com/maps/api/js?libraries=geometry&sensor=true&key=AIzaSyBqnuEpGwMjXHP_v3kzAhHEn1YRhOlwsuE"-->
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+        <script type="text/javascript" src="../libs/jqwidgets-3.8.1/jqxcore.js"></script>
+        <script type="text/javascript" src="../libs/jqwidgets-3.8.1/jqx-all.js"></script>
+        <script type="text/javascript" src="../libs/gmap3/gmap3.min.js"></script>
+        <script type="text/javascript" src="../libs/opensave/opensave.js"></script>
+        <script type="text/javascript" src="../libs/papaParse/jquery.parse.js"></script>
+        <script type="text/javascript" src="../libs/date/date.js"></script>
+        <script type="text/javascript"  src="downloadWind.js?t=0"></script>
+        <script type="text/javascript"    src="gribParser.js?t=0"></script>
+        <script type="text/javascript"    src="prediction.js?t=0"></script>
+        <script type="text/javascript"   src="predResults.js?t=0"></script>
+        <script type="text/javascript"     src="loadLocal.js?t=0"></script>
+        <script type="text/javascript"   src="addTooltips.js?t=0"></script>
+        <script type="text/javascript"  src="buildOverlay.js?t=0"></script>
+
+        <style>
+
+        </style>
+
+        <script>
+            //
+            // Copyright (c)2014 Jerry Gable (www.s3research.com)
+            // Except where otherwise noted, this work is licensed under a Creative Commons Attribution-NonCommercial 4.0 International License.
+            // http://creativecommons.org/licenses/by-nc/4.0/
+            //
+
+            // create the worker that does the prediction
+            var worker = new Worker("worker.js?t=1a");
+
+            // a few global variables
+            var maintheme = "fresh";
+            var UTCoffset = 0; // offset of clock from UTC
+            var debugLevel = 0;
+            var weatherData = new Array();
+            var windBoxes = new Array(); // wind boxes that are displayed on the map
+            var currentPrediction = new Object();
+            var predictionData = new Array();  // the prediction table data
+            var nextPredictionID = 1; // the id for the next prediction inserted into the table
+            var altChartData = new Array();
+            var altChartSettings = new Object();
+            var loadLocalGlobals = {
+                localFileString: "",
+                predictOrCSV: -1
+            }
+            // marker colors
+            var markerColorArray = ['C89D7D', 'FA8E07', '6B97FF', '00BF00', 'FFACFE', 'FF766C', 'BCE3FF', '98EC7D', 'C99BFE', 'AEAE00'];
+            var lineColorArray = ['6E5645', '965504', '4662A6', '007300', '664566', '8C413B', '424F59', '35532C', '463659', '464600']; 
+            // send debug messages to the console
+            function dbg (lvl, msg) {
+                if (debugLevel >= lvl) {
+                    var d = new Date();
+                    console.log(d.toISOString() + "  L" + lvl + "  " + msg);
+                }
+            }
+            // the following is the warning when leaving the page
+            window.onbeforeunload = function(e) {
+              return 'All weather and prediction data will be lost.';
+            };
+            // the following code isn't run until the document has finished loading
+            $(document).ready(function(){
+            
+                worker.onmessage = function(event) {
+                    processWorkerReturn (event.data);
+                };
+
+                worker.onerror = function(error) {
+                    dbg(0, "Worker error: " + error.message + "\n");
+                    dbg(0, "    Full error object: " + JSON.stringify(error));
+                    throw error;
+                };
+
+                // extract the Date and Time from the response header
+                function getHeaderTime () {
+                    var str = this.getResponseHeader("Date");
+                    str = str.slice(0, -4);
+                    var tmp1 = new Date();
+                    tmp1= Date.parseString(str, "E, d MMM yyyy H:m:s");
+                    var tmp2 = new Date();
+                    UTCoffset = tmp2.getTime() - tmp1.getTime();
+                    var tmp3 = new Date(tmp2.getTime() - UTCoffset);
+                    insertTime(tmp3);
+                    // set the forecast cycle time
+                    $("#forecastCycle").val(getDefaultForecastCycle()); // set the forecast cycle default
+
+                    // now calculate how long until 00 seconds and set a timeout for then
+                    var tmp4 = (60 - tmp3.getSeconds()) * 1000;
+                    var tmp5 = setTimeout(function () {firstTimeUpdate()}, tmp4);
+                }
+
+                // this function will be called the first time the time is 00 seconds
+                function  firstTimeUpdate () {
+                    var tmp1 = new Date();
+                    var tmp2 = new Date(tmp1.getTime() - UTCoffset);
+                    insertTime(tmp2);
+                    // now set up an interval to do it once a minute from here on out
+                    var tmp3 = setInterval(function () {oneMinuteUpdate()}, 60000);
+                }
+
+                // update the UTC clock once a minute 
+                function  oneMinuteUpdate () {
+                    var tmp1 = new Date();
+                    var tmp2 = new Date(tmp1.getTime() - UTCoffset);
+                    insertTime(tmp2);
+                }
+
+                // Format & insert the time into the UTC time doc element
+                function insertTime (dateIn) {
+                    var tmp1 = dateIn.format("MMM dd, yyyy  HH:mm");
+                    $("#CurrentUTC").text(tmp1);
+                }
+
+                // request the headers to get the current UTC time
+                var oReq = new XMLHttpRequest();
+                oReq.open("HEAD" /* use HEAD if you only need the headers! */, "simple.txt", true);
+                oReq.onload = getHeaderTime;
+                oReq.send();                
+            
+                dbg (0, "Document loaded.");
+
+                // Init the OKCancel window
+                $('#DeleteRowConfirm').jqxWindow({
+                    maxHeight: 150, maxWidth: 280, minHeight: 30, minWidth: 250, height: 145, width: 270,
+                    resizable: false, isModal: true, modalOpacity: 0.3,
+                    autoOpen: false, theme: maintheme,
+                    okButton: $('#ok'), cancelButton: $('#cancel'),
+                    initContent: function () {
+                        $('#ok').jqxButton({ width: '65px' });
+                        $('#cancel').jqxButton({ width: '65px' });
+                        $('#ok').focus();
+                    }
+                });
+                // handler for the DeleteRowConfirm modal box
+                 $('#DeleteRowConfirm').on('close', function (event) {
+                    // question box closed, do what was requested
+                    DeleteRowConfirmClosed(event);
+                });
+                $('#loadLocalFile').jqxWindow({
+                    height: 200, width: 600,
+                    position: 'top',
+                    resizable: true, isModal: true, modalOpacity: 0.3,
+                    draggable: true,
+                    autoOpen: false, theme: maintheme,
+                    okButton: $('#LFok'), cancelButton: $('#LFcancel'),
+                    initContent: function () {
+                        $("#selectLocalFileDiv").hide();
+                        $("#predictCSV").jqxButtonGroup({ mode: 'radio', theme: maintheme });
+                        $('#LFok').jqxButton({ width: '65px' });
+                        $('#LFcancel').jqxButton({ width: '65px' });
+                        $("#CSVType").jqxButtonGroup({ mode: 'radio', theme: maintheme });
+                        $('#csvLoadOptions').hide();
+                    }
+                });
+                // handler for load or close button click
+                $('#loadLocalFile').on('close', function (event) {
+                    //load file dialog done, do what was requested
+                    if (event.args.dialogResult.OK) {
+                        loadLocalFileLoadClicked();
+                    }
+
+                });
+                $('#predictCSV').on('buttonclick', function (event) {
+                    loadLocalGlobals.predictOrCSV = $('#predictCSV').jqxButtonGroup('getSelection');
+                    loadFileTypeSelected();
+
+                });
+                $('#CSVType').on('buttonclick', function (event) {
+                    loadLocalGlobals.CSVType = $('#CSVType').jqxButtonGroup('getSelection');
+                    loadFileTypeSelected();
+                });
+                $("#LFFlightName").jqxInput({height: 25, width: 350, theme: maintheme});
+                $("#LFCallsign").jqxInput({height: 25, width: 100, theme: maintheme});
+
+                // Build the top tabs and splits
+                $("#topTabs").jqxTabs({ height: '100%', width: '100%', theme: maintheme });
+                $('#splitter1').jqxSplitter({ height: '99.5%', width: '99.75%', orientation: 'horizontal', theme: maintheme,  panels: [{ size: "12%" }, { size: "88%" }] });
+                $('#splitter2').jqxSplitter({ height: '100%', width: '100%', orientation: 'horizontal', theme: maintheme,  panels: [{ size: "70%", collapsible: false}, { size: "30%" }] });
+                $('#vertSplit').jqxSplitter({ height: '100%', width: '100%', orientation: 'vertical', theme: maintheme, resizable: false, panels: [{ size: "170px", collapsible: false }, { size: "auto", collapsible: false }] });
+                $("#debugbtn").jqxButtonGroup({ mode: 'radio', theme: maintheme });
+                $('#debugbtn').jqxButtonGroup('setSelection', 0);
+                dbg (0,"Tabs and Splitters inserted.");
+                $.get('help.html', function( data ) { $( '#help' ).html( data ); }, 'html' );
+                dbg (0,"Help loaded.");
+                // see if we have the html5 functions we need
+                if (window.File && window.FileReader && window.FileList && window.Blob) {
+                    // All the File APIs are supported.  Hide the warning
+                    $("#html5warning").hide();
+                }
+                $("#forecastCycle").jqxInput({height: 25, width: 100, rtl: true, theme: maintheme});
+                $("#PILaunchDate").jqxDateTimeInput({ width: '170px', height: '25px',  formatString: 'MMMM dd, yyyy', showFooter:true, 
+                    theme: maintheme });
+                $("#PILaunchTime").jqxMaskedInput({height: 25, width: 40, mask: '[0-2][0-9]:[0-5][0-9]', theme: maintheme});
+                $("#PIFlightName").jqxInput({height: 25, width: 250, theme: maintheme});
+                // set the default name to date
+                var date = new Date();
+                $('#PIFlightName').val('Pred. from '+ date.format("MM/dd/yy"));
+                $("#PICallsign").jqxInput({height: 25, width: 100, theme: maintheme});
+                $("#PILat").jqxInput({height: 25, width: 100, rtl: true, theme: maintheme});
+                $("#PILat").val(33.43400);
+                $("#PILong").jqxInput({height: 25, width: 100, rtl: true, theme: maintheme});
+                $("#PILong").val(-112.01200);
+                $("#PILnchAlt").jqxInput({height: 25, width: 100, rtl: true, theme: maintheme});
+                $("#PILnchAltDiv").hide();
+                $("#PIAutoLnch").change(function () {
+                    if ($('#PIAutoLnch').is(':checked')) {
+                        $("#PILnchAltDiv").hide();
+                    } else {
+                        $("#PILnchAltDiv").show();
+                    }
+                });
+                $("#PITDAlt").jqxInput({height: 25, width: 100, rtl: true, theme: maintheme});
+                $("#PITDAltDiv").hide();
+                $("#PIAutoTD").change(function () {
+                    if ($('#PIAutoTD').is(':checked')) {
+                        $("#PITDAltDiv").hide();
+                    } else {
+                        $("#PITDAltDiv").show();
+                    }
+                });
+                $("#PIFloatTime").jqxInput({height: 25, width: 100, rtl: true, theme: maintheme});
+                $("#PIFloatTimeDiv").hide();
+                $("#PIFloatChk").change(function () {
+                    if ($('#PIFloatChk').is(':checked')) {
+                        $("#PIFloatTimeDiv").show();
+                        $("#burstAltLabel").text("Float Altitude:");
+                    } else {
+                        $("#PIFloatTimeDiv").hide();
+                        $("#burstAltLabel").text("Burst Altitude:");
+                    }
+                });
+                $("#PIBurst").jqxInput({height: 25, width: 100, rtl: true, theme: maintheme});
+                $("#PIBurst").val(105000);
+                $("#PIAscent").jqxInput({height: 25, width: 100, rtl: true, theme: maintheme});
+                $("#PIAscent").val(1000);
+                $("#PIDescent").jqxInput({height: 25, width: 100, rtl: true, theme: maintheme});
+                $("#PIDescent").val(1000);
+
+                $("#PIGeneratePred").jqxButton({ width: '200', height: '30', theme: maintheme});
+                $("#PIGeneratePred").on('click', function () {predictionClicked();});
+                $("#autofit").jqxButton({ width: '170', height: '25', theme: maintheme});
+                $("#loadPred").jqxButton({ width: '170', height: '25', theme: maintheme});
+                $("#delPred").jqxButton({ width: '170', height: '25', theme: maintheme});
+                $("#showRuler").change(function () {
+                    addruler($('#showRuler').is(':checked'));
+                });
+                // delete Prediction clicked
+                $("#delPred").on('click', function () {
+                    deletePrediction();
+                });
+                // load Prediction clicked
+                $("#loadPred").on('click', function () {
+                    loadPrediction();
+                });
+                // Autofit the map to what is being shown
+                $("#autofit").on('click', function () {
+                    autoZoomMap();
+                });
+                // show/hide the weather box on the map
+                $('#showWeather').change( function () {
+                    showWeatherOnMap();
+                });
+
+                // put in the save prediction button
+                opensave.make({ width: 200, height: 30, label: "Save Prediction As...", buttonDiv: "savePredictionButton", handler: savePredictionHandler});
+                
+                $("#generateOverlay").jqxButton({ width: '170', height: '25', theme: maintheme});
+                $("#generateOverlay").on('click', function () {generateOverlay(currentPrediction);});
+                $("#otherCallsigns").jqxInput({height: 25, width: 550, rtl: false, theme: maintheme});
+                
+                $('#saveButton').hide();
+                $('#genOverlayDIV').hide();
+                // Put in the default map in gmapArea
+                $("#gmapArea").gmap3({
+                    map:{
+                        options: {
+                            center: [50, -135],
+                            zoom:5,
+                            mapTypeId: google.maps.MapTypeId.TERRAIN,
+                            mapTypeControl: true,
+                            mapTypeControlOptions: {
+                              style: google.maps.MapTypeControlStyle.DROPDOWN_MENU
+                            },
+                            navigationControl: true,
+                            scrollwheel: true,
+                        }
+                    }
+                });
+
+                var toolTipCustomFormatFn = function (value, itemIndex, serie, group, categoryValue, categoryAxis) {
+                    return '<DIV style="text-align:left"><b>'+ serie.displayText +'</b><br />Time: ' + categoryValue +
+                        ' Minutes<br />Altitude: ' + value +
+                        ' Feet</DIV>';
+                };
+                var IDcellsrenderer = function (row, columnfield, value, defaulthtml, columnproperties) {
+                    return  '<div style="background-color:#'+markerColorArray[value%10]+';, padding:-2px;">' + defaulthtml + '</div>';
+                }
+
+                // create the data adaptor for the prediction table
+                var predTableSource =
+                {
+                    localdata: predictionData,
+                    datatype: "array",
+                };
+//                var dataAdapter = new $.jqx.dataAdapter(predTableSource);
+                // and create the grid
+                $("#predTable").jqxGrid(
+                {
+                    theme: maintheme,
+                    width: '100%',
+                    height: '98%',
+                    editable: true,
+                    source: predTableSource,
+                    columnsresize: true,
+                    columns: [
+                        { text: 'ID', editable: false, dataField: 'id', width: 25, align: 'center', pinned: true, cellsrenderer: IDcellsrenderer},
+                        { text: 'Type', editable: false, dataField: 'type', width: 75, align: 'center'},
+                        { text: 'Name', editable: false, dataField: 'name', width: 250, align: 'center'},
+                        { text: 'Callsign', editable: false, dataField: 'callsign', width: 90, align: 'center'},
+                        { text: 'Time', editable: false, dataField: 'lnchTime', width: 60, columngroup: 'Launch', align: 'center'},
+                        { text: 'Altitude', editable: false, dataField: 'lnchAlt', width: 65, columngroup: 'Launch', align: 'center'},
+                        { text: 'Dist.', editable: false, dataField: 'lnchDist', width: 65, columngroup: 'Launch', align: 'center'},
+                        { text: 'Time', editable: false, dataField: 'floatTime', width: 75, columngroup: 'Float', align: 'center'},
+                        { text: 'Altitude', editable: false, dataField: 'floatAlt', width: 65, columngroup: 'Float', align: 'center'},
+                        { text: 'Dist.', editable: false, dataField: 'floatDist', width: 65, columngroup: 'Float', align: 'center'},
+                        { text: 'Time', editable: false, dataField: 'brstTime', width: 75, columngroup: 'Burst', align: 'center'},
+                        { text: 'Altitude', editable: false, dataField: 'brstAlt', width: 65, columngroup: 'Burst', align: 'center'},
+                        { text: 'Dist.', editable: false, dataField: 'brstDist', width: 65, columngroup: 'Burst', align: 'center'},
+                        { text: 'Time', editable: false, dataField: 'tdTime', width: 75, columngroup: 'Touchdown', align: 'center'},
+                        { text: 'Altitude', editable: false, dataField: 'tdAlt', width: 65, columngroup: 'Touchdown', align: 'center'},
+                        { text: 'Dist.', editable: false, dataField: 'tdDist', width: 65, columngroup: 'Touchdown', align: 'center'},
+                        { text: 'Waypts', columntype: 'checkbox', dataField: 'showWP', width: 60, columngroup: 'showHide', align: 'center'},
+                        { text: 'Launch', columntype: 'checkbox', dataField: 'showL', width: 60, columngroup: 'showHide', align: 'center'},
+                        { text: 'Float', columntype: 'checkbox', dataField: 'showF', width: 50, columngroup: 'showHide', align: 'center'},
+                        { text: 'Burst', columntype: 'checkbox', dataField: 'showB', width: 50, columngroup: 'showHide', align: 'center'},
+                        { text: 'TD', columntype: 'checkbox', dataField: 'showTD', width: 50, columngroup: 'showHide', align: 'center'},
+                        { text: 'Line', columntype: 'checkbox', dataField: 'showLine', width: 50, columngroup: 'showHide', align: 'center'},
+
+                        { text: 'lnchLat', editable: false, dataField: 'lnchLat', hidden: true},
+                        { text: 'lnchLng', editable: false, dataField: 'lnchLng', hidden: true},
+                        { text: 'brstLat', editable: false, dataField: 'brstLat', hidden: true},
+                        { text: 'brstLng', editable: false, dataField: 'brstLng', hidden: true},
+                        { text: 'tdLat', editable: false, dataField: 'tdLat', hidden: true},
+                        { text: 'tdLng', editable: false, dataField: 'tdLng', hidden: true}
+                    ],
+                    columngroups: [
+                        {text: 'Launch', name: 'Launch', align: 'center'},
+                        {text: 'Float', name: 'Float', align: 'center'},
+                        {text: 'Burst', name: 'Burst', align: 'center'},
+                        {text: 'Touchdown', name: 'Touchdown', align: 'center'},
+                        {text: 'Show/Hide on Map', name: 'showHide', align: 'center'}
+                    ]
+                });
+            // apply the new scheme by setting the chart's colorScheme property
+            altChartSettings = {
+                title: "Altitude Profile",
+                description: null,
+                enableAnimations: true,
+                showLegend: true,
+                padding: { left: 10, top: 5, right: 10, bottom: 5 },
+                titlePadding: { left: 90, top: 0, right: 0, bottom: 10 },
+                source: altChartData,
+                categoryAxis:
+                    {
+                        dataField: 'timestamp',
+                        type: 'linear',
+                        showTickMarks: true,
+                        valuesOnTicks: true,
+                        tickMarksInterval: 5,
+                        tickMarksColor: '#888888',
+                        unitInterval: 5,
+                        gridLinesInterval: 10,
+                        gridLinesColor: '#888888',
+                        axisSize: 'auto'
+                    },
+                colorScheme: 'scheme05',
+                seriesGroups:
+                    [
+                        {
+                            type: 'line',
+                            toolTipFormatFunction: toolTipCustomFormatFn,
+                            valueAxis:
+                            {
+                                unitInterval: 10000,
+                                minValue: 0,
+                                description: 'Altitude in Feet',
+                                axisSize: 'auto',
+                                gridLinesInterval: 20000,
+                                tickMarksColor: '#888888'
+                            },
+                            series: []
+                        }
+                    ]
+            };
+            // setup the chart
+            $('#altGraphArea').jqxChart(altChartSettings);
+                // handler for the show/hide checkboxes in the prediction tables
+                $("#predTable").on('cellendedit', function (event) {
+                    // interesting event.args: .datafield, .rowindex, .value
+                    var data = $('#predTable').jqxGrid('getrowdata', event.args.rowindex);
+                    dbg(1, "Selection changed in Prediction table.  Row: " + event.args.rowindex + "  PredID: " + data.id + "  Field: " + event.args.datafield + "  Value: " + event.args.value);
+                    showHide (data.id, event.args.datafield, event.args.value);
+                });
+                // resize the map if the splitters are moved or the tab is selected
+                $('#splitter1').on('resize', function (event) {
+                    $('#gmapArea').gmap3({trigger:"resize"});
+                });
+                $('#splitter2').on('resize', function (event) {
+                    $('#gmapArea').gmap3({trigger:"resize"});
+                });
+                $('#topTabs').on('selected', function (event) {
+                    if (event.args.item == 2) {
+                        // need to autofit when we first show the map
+                        setTimeout(function(){
+                            // we want to give the page time to render before we resize everything
+                            $('#altGraphArea').jqxChart('refresh');
+                            $('#gmapArea').gmap3({trigger:"resize"});
+                        }, 200);
+                    }
+                });
+
+                // handler for debug level button click
+                $('#debugbtn').on('buttonclick', function (event) {
+                    debugLevel = event.args.index;
+                    dbg(0,"Debug level set to " + debugLevel);
+                });
+                
+                $("#windLoadProgressBar").jqxProgressBar({ width: 300, height: 15, value: 0, theme: maintheme});
+                $('#windFileLoading').hide(); // hide the loading message
+                // finally add the tooltips 
+                addTooltips();
+            });
+        </script>
+    </head>
+    <body class='default'>
+        <div class="jqx-hideborder jqx-hidescrollbars" id="topTabs">
+         <ul>
+            <li style="margin-left: 30px;">Instructions</li>
+            <li id="predTab">Prediction Info</li>
+            <li id="resultsTab">Prediction Results</li>
+            <li>About and Credits</li>
+        </ul>
+            <div style="text-align: center;">
+                <!-- Tab 1-->
+                <h2>Flight Predictor</h2>
+               <div id="html5warning">WARNING: The HTML5 File APIs are not fully supported in this browser. Upgrade to the latest browser version to use Flight Predictor.</div>
+               <div id="help"></div>
+            </div>
+            <div>
+                <!-- Tab 3-->
+                <div class="centeredBox">
+                    <h1>Prediction Input</h1>
+                    <div class="PILine">
+                        <div class="PILabel">Prediction Name:</div>
+                        <div class="PIValue"><input type="text" id="PIFlightName"/></div>
+                    </div>
+                    <div class="PILine">
+                        <div class="PILabel">Tracker Callsign:</div>
+                        <div class="PIValue"><input type="text" id="PICallsign"/></div>
+                    </div>
+                    <div class="PILine">
+                        <div class="PILabel">NOAA GFS Forecast:</div>
+                        <div class="PIValue"><input type="text" id="forecastCycle"/>(yyyymmddhh UTC) Defaults to latest avail.</div>
+                    </div>
+                    <div class="PILine">
+                        <div class="PILabel">Launch Latitude:</div>
+                        <div class="PIValue"><input type="text" id="PILat"/></div>
+                    </div>
+                    <div class="PILine">
+                        <div class="PILabel">Launch Longitude:</div>
+                        <div class="PIValue"><input type="text" id="PILong"/></div>
+                    </div>
+                    <div class="PILine">
+                        <div class="PILabel">Auto Launch Altitude:</div>
+                        <div class="PIValue"><input type="checkbox" id="PIAutoLnch" checked/> (From Google Maps)</div>
+                    </div>
+                    <div class="PILine" id="PILnchAltDiv">
+                        <div class="PILabel">Launch Altitude:</div>
+                        <div class="PIValue"><input type="text" id="PILnchAlt"/> Feet</div>
+                    </div>
+                    <div class="PILine">
+                        <div class="PILabel">Current UTC Time:</div>
+                        <div class="PIValue"><div id='CurrentUTC'>07/06/2015 13:42</div></div>
+                        <div class="PIUnits"></div>
+                    </div>
+                    <div class="PILine">
+                        <div class="PILabel">Launch Time:</div>
+                        <div class="PIValue"><div id='PILaunchDate'></div></div>
+                        <div class="PIUnits"><input type="text" id="PILaunchTime"/> <span style="font-weight: bold; color: red;">UTC Time</span></div>
+                    </div>
+                    <div class="PILine">
+                        <div class="PILabel" id="burstAltLabel">Burst Altitude:</div>
+                        <div class="PIValue"><input type="text" id="PIBurst"/></div>
+                        <div class="PIUnits">Feet</div>
+                    </div>
+                    <div class="PILine">
+                        <div class="PILabel">Balloon is Floater:</div>
+                        <div class="PIValue"><input type="checkbox" id="PIFloatChk"/></div>
+                    </div>
+                    <div class="PILine" id="PIFloatTimeDiv">
+                        <div class="PILabel">Float Time:</div>
+                        <div class="PIValue"><input type="text" id="PIFloatTime"/> Minutes</div>
+                    </div>
+                    <div class="PILine">
+                        <div class="PILabel">Ascent Rate:</div>
+                        <div class="PIValue"><input type="text" id="PIAscent"/></div>
+                        <div class="PIUnits">Feet/Minute</div>
+                    </div>
+                    <div class="PILine">
+                        <div class="PILabel">Descent Rate:</div>
+                        <div class="PIValue"><input type="text" id="PIDescent"/></div>
+                        <div class="PIUnits">Feet/Minute</div>
+                    </div>
+                    <div class="PILine">
+                        <div class="PILabel">Auto Touchdown Alt:</div>
+                        <div class="PIValue"><input type="checkbox" id="PIAutoTD" checked/> (From Google Maps)</div>
+                    </div>
+                    <div class="PILine" id="PITDAltDiv">
+                        <div class="PILabel">Touchdown Altitude:</div>
+                        <div class="PIValue"><input type="text" id="PITDAlt"/> Feet</div>
+                    </div>
+                    <div class="PILine">
+                        <input type="button" value="Generate Prediction" id='PIGeneratePred' />
+                    </div>
+                        <div class="PILine" id="predData" style="text-align: center;">
+                    </div>
+                    <div class="PILine" id="saveButton" style="text-align: center;">
+                        <div id="savePredTooltip"><div id="savePredictionButton"> Save Text Field Button Target Div</div></div>
+                    </div>
+                </div>
+                <div class="centeredBox" id="windFileLoading">
+                    <div style="text-align:center;">
+                        <h2>Creating Prediction.  Please wait...</h2>
+                        <p id="currentState"></p>
+                        <div style='margin-top: 10px; overflow: hidden; margin-left:auto; margin-right:auto;width:300px;' id="windLoadProgressBar"></div>
+                    </div>
+                </div>
+                <div class="centeredBox" id="genOverlayDIV" style="height:auto">
+                    <h3>Generate aprs.fi Overlay</h3>
+                    <div class="PILine">Enter extra callsigns you want to track. Separate with commas. aprs.fi wildcards are OK<br> (example: KF7MVY-11,KF7MVY-3,WA0TJT-*)</div>
+                    <div class="PILine"><input type="text" id="otherCallsigns"/></div>
+                    <div class="PILine"><input type="button" value="Generate Overlay" id='generateOverlay' /></div>
+                    <div class="PILine" id="overlayLink"></div>
+                    <div class="PILine" id="uploadresults"></div>
+                </div>
+            </div>
+            <div style="width: 100%; height: 100%;">
+                <!-- Tab 4-->
+                <div id="splitter1">
+                    <div>
+                        <div id="vertSplit">
+                            <!-- Split 1-->
+                            <div>
+                                <input type="button" value="Auto Fit Map" id='autofit' /><br>
+                                <input type="checkbox" id="showWeather">Show Wind Area<br></input>
+                                <input type="button" value="Load Local File..."  id='loadPred' /><br>
+                                <input type="button" value="Delete Prediction..." id='delPred' /><br>
+                                <input type="checkbox" id="showRuler">Ruler: </input><b><span id="rulerLen">xxx.xx</span></b> <span id="rulerUnit">Miles</span><br>
+                            </div>
+                            <div>
+                                <div id=predTable></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <!-- Split 2-->
+                        <div id="splitter2">
+                            <div>
+                                <!-- Split 2a-->
+                                <div id="gmapArea" style="height: 100%; width: 100%;"></div>
+
+                            </div>
+                            <div>
+                                <!-- Split 2b-->
+                                <div id="altGraphArea" style="height: 100%; width: 100%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <!-- Tab 5-->
+                <div class="centeredBox">
+                    <h3>Flight Predictor</h3>
+                    <p>
+                     Copyright (c)2014 Jerry Gable (www.s3research.com)
+                    </p>
+                    <br>
+                   <a rel="license" href="http://creativecommons.org/licenses/by-nc/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-nc/4.0/88x31.png" /></a>
+                   <br />Except as otherwise noted, this work is licensed under <a rel="license" href="http://creativecommons.org/licenses/by-nc/4.0/">Creative Commons Attribution-NonCommercial 4.0 International License</a>.
+                   <br>
+                   <p>Special thanks to Keith Kaiser for inspiring this tool as well as supporting its development and testing.</p>
+                   <p>Version: 08-06-2014 Beta</p>
+                   <hr>
+                   <div style="text-align: left;">
+                       Thanks to the companies and individuals that developed the libraries used in this tool.<br>
+                       <p> jQuery (<a href="http://jquery.com/">http://jquery.com/</a>). License: MIT License</p>
+                       <p>jQWidgets (<a href="http://www.jqwidgets.com">http://www.jqwidgets.com</a>) License: <a href="http://creativecommons.org/licenses/by-nc/3.0/">Creative Commons Attribution-NonCommercial 3.0 License</a></p>
+                       <p> GMAP3 Plugin for jQuery by DEMONTE Jean-Baptiste (<a href="http://gmap3.net">http://gmap3.net</a>). License: GPL v3 <a href="http://www.gnu.org/licenses/gpl.html">http://www.gnu.org/licenses/gpl.html</a>
+                       <p> OpenSave by Mike Gieson (<a href="www.gieson.com">www.gieson.com/</a>). License: MIT License</p>
+                       <p> Papa Parse by Matt Holt (<a href="https://github.com/mholt/jquery.parse">https://github.com/mholt/jquery.parse</a>). License: MIT License</p>
+                       <p> date.js library by Matt Kruse (<a href="http://javascripttoolbox.com">http://javascripttoolbox.com</a>). License: MIT License</p>
+                       <p> And of course none of this would be possible without Google Maps API v3</p>
+                       <hr>
+                    </div>
+                    <div>
+                        <h3>Debug Log</h3>
+                         <div id='debugbtn' style="margin: 10px; margin-left: auto; margin-right: auto; width:175px;">
+                            <button style="padding:4px 16px;" id="Off">Off</button>
+                            <button style="padding:4px 16px;" id="Level1">Basic</button>
+                            <button style="padding:4px 16px;" id="Level2">Full</button>
+                        </div>
+                        <p>This can be used to figure out where things went wrong.<br>Output goes to Console in Developer Tools.</p>
+                   </div>
+
+               </div>
+            </div>
+        </div>
+        <!-- The following is the OK/Cancel modal window -->
+        <div id="DeleteRowConfirm">
+            <div>Delete Prediction</div>
+            <div>
+                <div id="message" style="padding: 15px;">
+                    Click "OK" to delete selected prediction.
+                </div>
+                <div>
+                    <div style="float: right; margin-top: 15px;">
+                        <input type="button" id="ok" value="OK" style="margin-right: 10px" />
+                        <input type="button" id="cancel" value="Cancel" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- This is the load local file button -->
+        <div id="loadLocalFile">
+            <div>Load Local File</div>
+            <div>
+                <div>
+                    <div id='predictCSV' style="margin: 10px;">
+                        <button style="padding:4px 16px;" id="localPred">Load Prediction</button>
+                        <button style="padding:4px 16px;" id="localCSV">Load Flight(.csv)</button>
+                    </div>
+                    <div id="selectLocalFileDiv" style="margin-bottom: 5px; margin-left: 10px; margin-right: 10px; text-align: left;">Select local file to load:
+                        <div id="windfile"><input type="file" id="LFInput" style="width: 100%;"></div>
+                    </div>
+                    <div id="csvLoadOptions">
+                        <div class="PILine">
+                            <div class="PILabel">Select CSV Format:</div>
+                            <div class="PIValue">
+                                <div id='CSVType' style="margin: 10px;">
+                                    <button style="padding:4px 16px;" id="aprsCSV">aprs.fi CSV</button>
+                                    <button style="padding:4px 16px;" id="finduCSV">findu.com CSV</button>
+                                    <button style="padding:4px 16px;" id="customCSV">CUSF CSV</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="PILine">
+                            <div class="PILabel">Prediction Name:</div>
+                            <div class="PIValue"><input type="text" id="LFFlightName"/></div>
+                        </div>
+                        <div class="PILine">
+                            <div class="PILabel">Tracker Callsign:</div>
+                            <div class="PIValue"><input type="text" id="LFCallsign"/></div>
+                        </div>
+                        <div class="PILine">
+                            <div class="PILabel">&nbsp;</div>
+                            <div class="PIValue"><input type="checkbox" id="fillPredictionInput"/>Fill prediction info from flight data.</div>
+                        </div>
+
+
+                    </div>
+                </div>
+                <div id="loadCancelDiv" style="position: absolute; bottom: 0; width: 100%; height: 50px; border: none;">
+                    <div style="float: right; margin-top: 15px; margin-right: 15px;">
+                        <input type="button" id="LFok" value="Load" style="margin-right: 10px" />
+                        <input type="button" id="LFcancel" value="Cancel" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>
