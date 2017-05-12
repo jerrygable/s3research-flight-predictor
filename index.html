@@ -6,8 +6,8 @@
         <link rel="stylesheet" href="flightPredictor.css" type="text/css" />
         <link rel="stylesheet" href="../libs/jqwidgets-3.8.1/styles/jqx.base.css" type="text/css" />
         <link rel="stylesheet" href="../libs/jqwidgets-3.8.1/styles/jqx.fresh.css" type="text/css" />
-        <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?libraries=geometry&sensor=true"></script>
-        <!-- type="text/javascript" src="https://maps.googleapis.com/maps/api/js?libraries=geometry&sensor=true&key=AIzaSyBqnuEpGwMjXHP_v3kzAhHEn1YRhOlwsuE"-->
+        <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?libraries=geometry"></script>
+        <!-- type="text/javascript" src="https://maps.googleapis.com/maps/api/js?libraries=geometry&key=AIzaSyBqnuEpGwMjXHP_v3kzAhHEn1YRhOlwsuE"-->
         <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
         <script type="text/javascript" src="../libs/jqwidgets-3.8.1/jqxcore.js"></script>
         <script type="text/javascript" src="../libs/jqwidgets-3.8.1/jqx-all.js"></script>
@@ -35,7 +35,7 @@
             //
 
             // create the worker that does the prediction
-            var worker = new Worker("worker.js?t=1a");
+            var worker = new Worker("worker.js?t=4y");
 
             // a few global variables
             var maintheme = "fresh";
@@ -73,10 +73,20 @@
                     processWorkerReturn (event.data);
                 };
 
-                worker.onerror = function(error) {
-                    dbg(0, "Worker error: " + error.message + "\n");
-                    dbg(0, "    Full error object: " + JSON.stringify(error));
-                    throw error;
+                worker.onerror = function(event) {
+                    dbg(0, "Worker error: " + event.message + "\n");
+                    dbg(0, "    Full error object: " + JSON.stringify(event));
+					$('#currentState').text('ERROR occured in background task.');
+					clearInterval(windloadTimeout); // stop the wind load progress bar
+					windloadTimeoutValue = 0;
+					$("#windLoadProgressBar").val(0);
+
+					
+					setTimeout(function(){
+							window.alert("ERROR:  An unknown error occured in the background task creating the prediction. Please check your input data and reload the page to continue.");
+						}, 500);
+					
+                    //throw error; 
                 };
 
                 // extract the Date and Time from the response header
