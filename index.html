@@ -1,13 +1,13 @@
 <!doctype html>
 <html lang="en">
     <head>
-        <title>NO GOOGLE KEY Balloon Flight Predictor</title>
+        <title>Balloon Flight Predictor 2</title>
         <meta charset="utf-8" />
         <link rel="stylesheet" href="flightPredictor.css" type="text/css" />
         <link rel="stylesheet" href="../libs/jqwidgets-3.8.1/styles/jqx.base.css" type="text/css" />
         <link rel="stylesheet" href="../libs/jqwidgets-3.8.1/styles/jqx.fresh.css" type="text/css" />
-        <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?libraries=geometry"></script>
-        <!-- type="text/javascript" src="https://maps.googleapis.com/maps/api/js?libraries=geometry&key=AIzaSyBqnuEpGwMjXHP_v3kzAhHEn1YRhOlwsuE"-->
+        <!-- type="text/javascript" src="https://maps.googleapis.com/maps/api/js?libraries=geometry"-->
+        <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?libraries=geometry&key=AIzaSyBqnuEpGwMjXHP_v3kzAhHEn1YRhOlwsuE"></script>
         <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
         <script type="text/javascript" src="../libs/jqwidgets-3.8.1/jqxcore.js"></script>
         <script type="text/javascript" src="../libs/jqwidgets-3.8.1/jqx-all.js"></script>
@@ -15,13 +15,13 @@
         <script type="text/javascript" src="../libs/opensave/opensave.js"></script>
         <script type="text/javascript" src="../libs/papaParse/jquery.parse.js"></script>
         <script type="text/javascript" src="../libs/date/date.js"></script>
-        <script type="text/javascript"  src="downloadWind.js?t=0"></script>
-        <script type="text/javascript"    src="gribParser.js?t=0"></script>
-        <script type="text/javascript"    src="prediction.js?t=0"></script>
-        <script type="text/javascript"   src="predResults.js?t=0"></script>
-        <script type="text/javascript"     src="loadLocal.js?t=0"></script>
-        <script type="text/javascript"   src="addTooltips.js?t=0"></script>
-        <script type="text/javascript"  src="buildOverlay.js?t=0"></script>
+        <script type="text/javascript"  src="downloadWind.js?t=5a"></script>
+        <script type="text/javascript"    src="gribParser.js?t=5a"></script>
+        <script type="text/javascript"    src="prediction.js?t=5a"></script>
+        <script type="text/javascript"   src="predResults.js?t=5a"></script>
+        <script type="text/javascript"     src="loadLocal.js?t=5a"></script>
+        <script type="text/javascript"   src="addTooltips.js?t=5a"></script>
+        <script type="text/javascript"  src="buildOverlay.js?t=5a"></script>
 
         <style>
 
@@ -35,7 +35,7 @@
             //
 
             // create the worker that does the prediction
-            var worker = new Worker("worker.js?t=4y");
+            var worker = new Worker("worker.js?t=5a");
 
             // a few global variables
             var maintheme = "fresh";
@@ -212,7 +212,7 @@
                 $("#PIFlightName").jqxInput({height: 25, width: 250, theme: maintheme});
                 // set the default name to date
                 var date = new Date();
-                $('#PIFlightName').val('Pred. from '+ date.format("MM/dd/yy"));
+                $('#PIFlightName').val(''+ date.format("MM/dd/yy"));
                 $("#PICallsign").jqxInput({height: 25, width: 100, theme: maintheme});
                 $("#PILat").jqxInput({height: 25, width: 100, rtl: true, theme: maintheme});
                 $("#PILat").val(33.43400);
@@ -247,12 +247,20 @@
                         $("#burstAltLabel").text("Burst Altitude:");
                     }
                 });
-                $("#PIBurst").jqxInput({height: 25, width: 100, rtl: true, theme: maintheme});
+                $("#PIBurst").jqxInput({height: 25, width: 80, rtl: true, theme: maintheme});
                 $("#PIBurst").val(105000);
-                $("#PIAscent").jqxInput({height: 25, width: 100, rtl: true, theme: maintheme});
+                $("#PIBurst2").jqxInput({height: 25, width: 80, rtl: true, theme: maintheme});
+                $("#PIBurst3").jqxInput({height: 25, width: 80, rtl: true, theme: maintheme});
+
+                $("#PIAscent").jqxInput({height: 25, width: 80, rtl: true, theme: maintheme});
                 $("#PIAscent").val(1000);
-                $("#PIDescent").jqxInput({height: 25, width: 100, rtl: true, theme: maintheme});
+                $("#PIAscent2").jqxInput({height: 25, width: 80, rtl: true, theme: maintheme});
+				$("#PIAscent3").jqxInput({height: 25, width: 80, rtl: true, theme: maintheme});
+
+                $("#PIDescent").jqxInput({height: 25, width: 80, rtl: true, theme: maintheme});
                 $("#PIDescent").val(1000);
+                $("#PIDescent2").jqxInput({height: 25, width: 80, rtl: true, theme: maintheme});
+                $("#PIDescent3").jqxInput({height: 25, width: 80, rtl: true, theme: maintheme});
 
                 $("#PIGeneratePred").jqxButton({ width: '200', height: '30', theme: maintheme});
                 $("#PIGeneratePred").on('click', function () {predictionClicked();});
@@ -506,9 +514,12 @@
                         <div class="PIValue"><div id='PILaunchDate'></div></div>
                         <div class="PIUnits"><input type="text" id="PILaunchTime"/> <span style="font-weight: bold; color: red;">UTC Time</span></div>
                     </div>
+					<div class="PILine">
+                        Enter up to 3 altitudes & ascent/descent rates for multiple predictions<br>(Filling all 9 boxes will result in 27 predictions)
+                    </div>
                     <div class="PILine">
                         <div class="PILabel" id="burstAltLabel">Burst Altitude:</div>
-                        <div class="PIValue"><input type="text" id="PIBurst"/></div>
+                        <div class="PIValue"><input type="text" id="PIBurst"/> <input type="text" id="PIBurst2"/> <input type="text" id="PIBurst3"/></div>
                         <div class="PIUnits">Feet</div>
                     </div>
                     <div class="PILine">
@@ -521,12 +532,12 @@
                     </div>
                     <div class="PILine">
                         <div class="PILabel">Ascent Rate:</div>
-                        <div class="PIValue"><input type="text" id="PIAscent"/></div>
+                        <div class="PIValue"><input type="text" id="PIAscent"/> <input type="text" id="PIAscent2"/> <input type="text" id="PIAscent3"/></div>
                         <div class="PIUnits">Feet/Minute</div>
                     </div>
                     <div class="PILine">
                         <div class="PILabel">Descent Rate:</div>
-                        <div class="PIValue"><input type="text" id="PIDescent"/></div>
+                        <div class="PIValue"><input type="text" id="PIDescent"/> <input type="text" id="PIDescent2"/> <input type="text" id="PIDescent3"/></div>
                         <div class="PIUnits">Feet/Minute</div>
                     </div>
                     <div class="PILine">

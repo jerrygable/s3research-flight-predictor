@@ -539,13 +539,13 @@ function downloadGrib(latIn, longIn, forecastHour) {
     var forecastCycle = tmpTime.format("yyyyMMddHH");
     var forecastCycleHour = tmpTime.format("HH");
     // calculate the 4 lat/long points surrounding the desired point
-    var latTop = latIn + (3 * 0.5);
+    var latTop = latIn + (5 * 0.5);
     latTop = roundHalf(latTop);
-    var latBot = latIn - (3 * 0.5);
+    var latBot = latIn - (5 * 0.5);
     latBot = roundHalf(latBot);
-    var longLeft = longIn - (3 * 0.5);
+    var longLeft = longIn - (5 * 0.5);
     longLeft = roundHalf(longLeft);
-    var longRight = longIn + (3 * 0.5);
+    var longRight = longIn + (5 * 0.5);
     longRight = roundHalf(longRight);
     // Create the URL with all of the params
     var bigURL = "http://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p50.pl?file=gfs.t";

@@ -16,11 +16,17 @@ function addTooltips () {
     $("#PIAutoLnch").jqxTooltip({ content: 'When checked the launch altitude is provide by Google Maps.  Uncheck to manually enter', position: 'top-right'});
     $("#PILnchAlt").jqxTooltip({ content: 'Manually enter the launch altitude here.', position: 'top-right'});
     $("#PILaunchTime").jqxTooltip({ content: 'Enter the launch time (UTC).', position: 'top-right'});
-    $("#PIBurst").jqxTooltip({ content: 'Enter the expected burst altitude', position: 'top-right'});
+    $("#PIBurst").jqxTooltip({ content: 'Enter the expected burst altitude.', position: 'top-right'});
+    $("#PIBurst2").jqxTooltip({ content: 'Enter another altitude for multiple predictions.', position: 'top-right'});
+    $("#PIBurst3").jqxTooltip({ content: 'Enter another altitude for multiple predictions.', position: 'top-right'});
     $("#PIFloatChk").jqxTooltip({ content: 'Check this box to enter a float time for the balloon', position: 'top-right'});
     $("#PIFloatTime").jqxTooltip({ content: 'Enter the float time in minutes.', position: 'top-right'});
     $("#PIAscent").jqxTooltip({ content: 'Enter the ascent rate of the balloon.', position: 'top-right'});
+    $("#PIAscent2").jqxTooltip({ content: 'Enter another ascent rate for multiple predictions.', position: 'top-right'});
+    $("#PIAscent3").jqxTooltip({ content: 'Enter another ascent rate for multiple predictions.', position: 'top-right'});
     $("#PIDescent").jqxTooltip({ content: 'Enter the sea level descent rate off the parachute.  Will be adjusted for altitude. ', position: 'top-right'});
+    $("#PIDescent2").jqxTooltip({ content: 'Enter another descent rate for multiple predictions. ', position: 'top-right'});
+    $("#PIDescent3").jqxTooltip({ content: 'Enter another descent rate for multiple predictions. ', position: 'top-right'});
     $("#PIAutoTD").jqxTooltip({ content: 'When checked the touchdown altitude is provide by Google Maps.  Uncheck to manually enter', position: 'top-right'});
     $("#PITDAlt").jqxTooltip({ content: 'Manually enter the touchdown altitude here.', position: 'top-right'});
     $("#savePredTooltip").jqxTooltip({ content: "Click this button to save this prediction on your computer.<br>NOTE: You don't have to save to view on the results page.", position: 'bottom', autoHideDelay: 5000});

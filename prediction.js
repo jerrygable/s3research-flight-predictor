@@ -7,10 +7,63 @@
 
 
 
-
+// global array to hold the list of predictions to run
+var runlist = [];
 // Prep for the prediction
 function predictionClicked() {
     dbg(1, "Prediction calculation starting"); 
+
+	// clear out the runlist
+	runlist.length = 0;
+	var burstList = [];
+	var ascentList = [];
+	var descentList = [];
+	
+	// set up some default values in case all boxes are empty
+	var burst = 100000;
+	var ascent = 1000;
+	var descent = 1000;
+
+	burstList.pushIfNot0 ($('#PIBurst3').val());
+	burstList.pushIfNot0 ($('#PIBurst2').val());
+	burstList.pushIfNot0 ($('#PIBurst').val());
+	
+	ascentList.pushIfNot0 ($('#PIAscent3').val());
+	ascentList.pushIfNot0 ($('#PIAscent2').val());
+	ascentList.pushIfNot0 ($('#PIAscent').val());
+
+	descentList.pushIfNot0 ($('#PIDescent3').val());
+	descentList.pushIfNot0 ($('#PIDescent2').val());
+	descentList.pushIfNot0 ($('#PIDescent').val());
+
+	dbg(1, "Arrays of Pred. run: Burst: " + JSON.stringify(burstList) + "   ascent: " + JSON.stringify(ascentList) + "   descent: " + JSON.stringify(descentList));
+	var tmpObj = {};
+	for (var ii = 0; ii < burstList.length; ii++) {
+		for (var jj = 0; jj < ascentList.length; jj++) {
+			for (var kk = 0; kk < descentList.length; kk++) {
+				tmpObj = {burst: burstList[ii], ascent: ascentList[jj], descent: descentList[kk]};
+				runlist.push(tmpObj);
+			}
+		}
+	}
+	// the first prediction run is called here, the rest are called at the end of wait for prediction.
+	if (runlist.length > 0) {
+		var tmprun = runlist.shift();
+		run1Prediction(tmprun.burst, tmprun.ascent, tmprun.descent);
+	}
+}
+
+// this will add the valIn to the array if it is a non 0 number
+Array.prototype.pushIfNot0 = function(valIn) {
+    var tmpVal = Number(valIn);
+	if ((!isNaN(tmpVal)) &&  (tmpVal != 0)) {
+			this.push(tmpVal);
+	}
+}; 
+
+
+// this runs a single prediction
+function run1Prediction(burst, ascent, descent) {
     // gather the info for the prediction
     
     // hide any previous results
@@ -29,9 +82,10 @@ function predictionClicked() {
 	launchTime.clearTime(); // remove the time part
     launchTime.add('h',timepart.getHours());
     launchTime.add('m',timepart.getMinutes());
-    
-var tmpD1 = launchTime.format("yyyy MM dd HH:mm"); 
-    
+ 
+	// create the name prefix
+	var tmpPrefix = Math.round(burst/1000) + "K B, " +  Math.round(ascent) + "Up, "  +  Math.round(descent) + "Dwn, ";
+ 
     // Put the prediction details in an object and convert to feet to meters
     // currentPrediction is declared at the top level (Global variable)
     currentPrediction = {
@@ -39,10 +93,11 @@ var tmpD1 = launchTime.format("yyyy MM dd HH:mm");
         launchLat : Number($('#PILat').val()),
         launchLng : Number($('#PILong').val()),
         launchAlt : 250, /* default Alt meters*/
-        burstAlt : Number($('#PIBurst').val()) * 0.3048, /* meters */
-        ascentRate : Number($('#PIAscent').val()) * 0.3048 / 60, /* m/s */
-        descentRate : Number($('#PIDescent').val()) * 0.3048 / 60, /* m/s */
-        name : $('#PIFlightName').val(),
+        burstAlt : burst * 0.3048, /* meters */
+        ascentRate : ascent * 0.3048 / 60, /* m/s */
+        descentRate : descent * 0.3048 / 60, /* m/s */
+		namePrefix : tmpPrefix,
+        name : tmpPrefix + $('#PIFlightName').val(),
         callsign : $('#PICallsign').val(),
         launchTime : launchTime,
 		launchTimeString : launchTime.format("yyyy MM dd HH:mm"),
@@ -165,7 +220,15 @@ function waitForPredictionDone () {
         windloadTimeoutValue = 0;
         $("#windLoadProgressBar").val(0);
         // insert the results into the map and table
-        insertPredictionResults(currentPrediction);    
+        insertPredictionResults(currentPrediction); 
+
+		// here we run the next queued rin if there are any
+		// runs queued at the end of predictionClicked
+		if (runlist.length > 0) {
+			var tmprun = runlist.shift();
+			run1Prediction(tmprun.burst, tmprun.ascent, tmprun.descent);
+		}
+
     } else {
         // prediction not done do this again after 100ms
         waitcount++;
