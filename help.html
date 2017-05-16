@@ -4,7 +4,19 @@ Balloon (HAB) flight.<br><br>
 
 <span style="font-weight: bold; color: red;">NOTE:&nbsp; The prediction is only as good as the input data.&nbsp; Make sure Burst Altitude, Ascent and Descent Rates are 
 as accurate as possible.</span><br>
-
+<hr>
+<h3>Changes -- 5/16/2017</h3>
+<ol>
+<li>All times are now UTC.  Local times use time zones set on client and could result in incorrect times being used.</li>
+<li>Better forecast interpolation.  Interpolation between forecast times is also used in addition to tri-linear interpolation of the 8 points around the balloon.  .<br>
+Note: This requires more weather forecast data to be downloaded and may slow down the tool.
+</li>
+<li>Multiple burst, ascent, and descent rates can be entered for multiple forecast variations without re-downloading forecast data.<br>
+Note: The data in the first column will be used for overlay and saved predictions.</li>
+<li>Habhub.org predictions (csv) can be loaded for comparison.</li>
+<li>Flight data can be extracted from an aprs.fi or findu.com flight to make running a post flight correlation easier.</li>
+</ol>
+<hr>
 <h3>Quick Start Instructions</h3>
 
 <ol><li>Enter the Prediction Info</li>
